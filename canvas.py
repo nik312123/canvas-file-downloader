@@ -31,7 +31,7 @@ def print_c(string, type_, padding, **kwarg):
 
 def get_external_download_url(url: str) -> str:
     """
-    This should return an URL where the file can be downloaded.
+    This should return a URL where the file can be downloaded.
     Supported sites:
     - docs.google.com
     """

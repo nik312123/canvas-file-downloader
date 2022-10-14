@@ -37,7 +37,7 @@ def get_external_download_url(url: str) -> str:
     """
 
     # Try Google Drive
-    exp = re.compile(r"https:\/\/drive\.google\.com\/file\/d\/(?P<id>[^\/]*?)\/")
+    exp = re.compile(r"https://drive\.google\.com/file/d/(?P<id>[^/]*?)/")
     result = exp.search(url)
     if result:
         document_id = result.group("id")

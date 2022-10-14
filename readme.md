@@ -26,7 +26,7 @@ python canvas.py YOUR-TOKEN CANVAS-DOMAIN
 Where:
 
 - `YOUR-TOKEN` is the token access of Canvas, generated [here][get_token].
-- `CANVAS-DOMAIN` the Canvas domain where files will be downloaded.
+- `CANVAS-DOMAIN` the Canvas domain where files will be downloaded (**Without** http:// or https://).
 
 Optional parameters:
 

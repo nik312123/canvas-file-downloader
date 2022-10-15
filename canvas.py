@@ -4,6 +4,7 @@ import argparse
 import dataclasses
 import os
 import re
+from typing import List, Callable
 
 import colorama
 import requests
@@ -143,10 +144,11 @@ class CanvasDownloader(CanvasApi):
             if restricted:
                 print(f"The following course was restricted by date: {course}")
                 continue
+            
             print_c(course["course_code"], type_ = "group", padding = 0)
             course_code, course_id = course["id"], course["course_code"]
             
-            methods = [self._download_from_modules, self._download_from_folders]
+            methods: List[Callable[[str, str], bool]] = [self._download_from_modules, self._download_from_folders]
             
             if use == "both":
                 for method in methods:

@@ -130,7 +130,7 @@ class CanvasDownloader(CanvasApi):
     
     out_dir: str
     
-    def download_files(self, all_courses = False, courses_ids = None, use = "both"):
+    def download_files(self, all_courses = False, use = "both"):
         """Downloads files from Canvas"""
         courses = self.get_courses(not all_courses)
         
@@ -310,4 +310,4 @@ if __name__ == "__main__":
     args = parser.parse_args()
     
     API = CanvasDownloader(args.domain, args.token, args.o)
-    API.download_files(args.all, args.f)
+    API.download_files(args.all, use = args.f)

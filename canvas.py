@@ -4,7 +4,7 @@ import argparse
 import dataclasses
 import os
 import re
-from typing import List, Callable
+from typing import List, Callable, Union
 
 import colorama
 import requests
@@ -12,7 +12,7 @@ import requests
 colorama.init(autoreset = True)
 
 
-def print_c(string, type_, padding, **kwarg):
+def print_c(string: str, type_: str, padding: int, **kwarg) -> None:
     """Prints with color"""
     if type_ == "error":
         padded = " " * (padding * 2) + "! " + string
@@ -43,7 +43,6 @@ def get_external_download_url(url: str) -> str:
     if result:
         document_id = result.group("id")
         return f"https://docs.google.com/uc?export=download&id={document_id}"
-    
     return ""
 
 
@@ -71,39 +70,40 @@ class CanvasApi:
     domain: str
     token: str
     
-    def __url(self, query):
+    def __url(self, query: str) -> str:
         return "/".join(("https:/", self.domain, "api/v1", query))
     
-    def __get(self, query: str, **kwarg):
+    def __get(self, query: str, **kwarg) -> Union[list, dict]:
         response = requests.get(
             url = self.__url(query),
             headers = {"Authorization": f"Bearer {self.token}"},
             **kwarg,
         )
         result = response.json()
-        while "next" in response.links:
+        while hasattr(response, "links") and "next" in response.links:
             response = requests.get(
                 response.links["next"]["url"],
                 headers = {"Authorization": f"Bearer {self.token}"},
             )
             result.extend(response.json())
+        # Returns dict in the case of errors
         return result
     
-    def get_courses(self, only_favorites: bool = True) -> list:
+    def get_courses(self, only_favorites: bool = True) -> Union[list, dict]:
         """Returns the enrolled courses"""
         if only_favorites:
             return self.__get("users/self/favorites/courses")
         return self.__get("courses")
     
-    def get_folders(self, course_id: int) -> list:
+    def get_folders(self, course_id: int) -> Union[list, dict]:
         """Gets the folders of a course"""
         return self.__get(f"courses/{course_id}/folders")
     
-    def get_modules(self, course_id: int) -> list:
+    def get_modules(self, course_id: int) -> Union[list, dict]:
         """Gets the modules of a course"""
         return self.__get(f"courses/{course_id}/modules")
     
-    def get_files_from_folder(self, folder_id: int, recent = True) -> list:
+    def get_files_from_folder(self, folder_id: int, recent: bool = True) -> Union[list, dict]:
         """Gets the files of a folder"""
         if recent:
             self.__get(
@@ -112,15 +112,15 @@ class CanvasApi:
             )
         return self.__get(f"folders/{folder_id}/files")
     
-    def get_modules_items(self, course_id: int, module_id: int) -> list:
+    def get_modules_items(self, course_id: int, module_id: int) -> Union[list, dict]:
         """Gets the module items of a course"""
         return self.__get(f"courses/{course_id}/modules/{module_id}/items")
     
-    def get_file_from_id(self, course_id: int, file_id: int) -> dict:
+    def get_file_from_id(self, course_id: int, file_id: int) -> Union[list, dict]:
         """Gets a file of a specific course using its id"""
         return self.__get(f"courses/{course_id}/files/{file_id}")
     
-    def get_folder_from_id(self, course_id: int, folder_id: int) -> dict:
+    def get_folder_from_id(self, course_id: int, folder_id: int) -> Union[list, dict]:
         """Gets a folder from a specific course using its id"""
         return self.__get(f"courses/{course_id}/folders/{folder_id}")
 
@@ -131,7 +131,7 @@ class CanvasDownloader(CanvasApi):
     
     out_dir: str
     
-    def download_files(self, all_courses = False, use = "both"):
+    def download_files(self, all_courses: bool = False, use: str = "both"):
         """Downloads files from Canvas"""
         courses = self.get_courses(not all_courses)
         
@@ -145,10 +145,10 @@ class CanvasDownloader(CanvasApi):
                 print(f"The following course was restricted by date: {course}")
                 continue
             
-            print_c(course["course_code"], type_ = "group", padding = 0)
+            print_c(course["course_code"], "group", 0)
             course_code, course_id = course["id"], course["course_code"]
             
-            methods: List[Callable[[str, str], bool]] = [self._download_from_modules, self._download_from_folders]
+            methods: List[Callable[[int, str], bool]] = [self._download_from_modules, self._download_from_folders]
             
             if use == "both":
                 for method in methods:
@@ -163,7 +163,7 @@ class CanvasDownloader(CanvasApi):
                 methods[1](course_code, course_id)
         return True
     
-    def _download_from_folders(self, course_id, course_name) -> bool:
+    def _download_from_folders(self, course_id: int, course_name: str) -> bool:
         folders_list = self.get_folders(course_id)
         for folder in folders_list:
             
@@ -175,7 +175,7 @@ class CanvasDownloader(CanvasApi):
             if "errors" in files_list:
                 return False
             
-            folder_path = [course_name] + folder["full_name"].split("/")[1:]
+            current_folder_path = [course_name] + folder["full_name"].split("/")[1:]
             print_c("[F] " + folder["full_name"], "item", 1)
             
             for file_obj in files_list:
@@ -183,12 +183,12 @@ class CanvasDownloader(CanvasApi):
                     continue
                 
                 self._download_file(
-                    file_obj["url"], folder_path, file_obj["display_name"]
+                    file_obj["url"], current_folder_path, file_obj["display_name"]
                 )
         
         return True
     
-    def _download_from_modules(self, course_id, course_name) -> bool:
+    def _download_from_modules(self, course_id: int, course_name: str) -> bool:
         modules_list = self.get_modules(course_id)
         
         for module in modules_list:
@@ -223,7 +223,7 @@ class CanvasDownloader(CanvasApi):
         
         return True
     
-    def _download_file(self, file_url, folder_path, name = ""):
+    def _download_file(self, file_url: str, folder_path: List[str], name: str = "") -> None:
         """Downloads a file from its URL.
         If a file name is given, the download request won't happen
         if a file with the same name exists.
@@ -234,7 +234,7 @@ class CanvasDownloader(CanvasApi):
         try:
             os.makedirs(os.path.join(dir_path), exist_ok = True)
         except NotADirectoryError:
-            print_c("error: invalid path", type_ = "error", padding = 2)
+            print_c("error: invalid path", "error", 2)
             return
         
         if name:  # if a name in given
@@ -243,7 +243,7 @@ class CanvasDownloader(CanvasApi):
             # Checks if the file exists
             file_path = os.path.join(self.out_dir, *folder_path, file_name)
             if os.path.exists(file_path):
-                print_c(file_name, type_ = "existing", padding = 2)
+                print_c(file_name, "existing", 2)
                 return
             # Starts the request if it doesn't
             download_response = requests.get(file_url, stream = True)
@@ -260,7 +260,7 @@ class CanvasDownloader(CanvasApi):
             # Checks if the file exists
             file_path = os.path.join(self.out_dir, *folder_path, file_name)
             if os.path.exists(file_path):
-                print_c(file_name, type_ = "existing", padding = 2)
+                print_c(file_name, "existing", 2)
                 return
         
         content_len = download_response.headers.get("content-length", None)

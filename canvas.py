@@ -93,8 +93,8 @@ class CanvasApi:
     def get_courses(self, only_favorites: bool = True) -> Union[list, dict]:
         """Returns the enrolled courses"""
         if only_favorites:
-            return self.__get("users/self/favorites/courses")
-        return self.__get("courses")
+            return self.__get("users/self/favorites/courses?include[]=term")
+        return self.__get("courses?include[]=term")
     
     def get_folders(self, course_id: int) -> Union[list, dict]:
         """Gets the folders of a course"""
@@ -155,9 +155,13 @@ class CanvasDownloader(CanvasApi):
                 continue
             
             print_c(course["course_code"], "group", 0)
-            course_code, course_id = course["id"], course["course_code"]
+            term, course_code, course_id = course["term"]["name"], course["id"], course["course_code"]
             
-            methods: List[Callable[[int, str], bool]]
+            # Removing / chars that would mess up the path
+            term = term.replace("/", "-")
+            course_id = course_id.replace("/", "-")
+            
+            methods: List[Callable[[str, int, str], bool]]
             
             if use == "modules":
                 methods = [self._download_from_modules]
@@ -169,10 +173,10 @@ class CanvasDownloader(CanvasApi):
                 methods = [self._download_from_modules, self._download_from_folders, self._download_from_assignments]
             
             for method in methods:
-                method(course_code, course_id)
+                method(term, course_code, course_id)
         return True
     
-    def _download_from_folders(self, course_id: int, course_name: str) -> bool:
+    def _download_from_folders(self, term: str, course_id: int, course_name: str) -> bool:
         folders_list = self.get_folders(course_id)
         for folder in folders_list:
             if not folder["files_count"]:
@@ -183,7 +187,7 @@ class CanvasDownloader(CanvasApi):
             if "errors" in files_list:
                 return False
             
-            current_folder_path = [course_name, "folders"] + folder["full_name"].split("/")[1:]
+            current_folder_path = [term, course_name, "folders"] + folder["full_name"].split("/")[1:]
             print_c("[F] " + folder["full_name"], "item", 1)
             
             for file_obj in files_list:
@@ -196,7 +200,7 @@ class CanvasDownloader(CanvasApi):
         
         return True
     
-    def _download_from_modules(self, course_id: int, course_name: str) -> bool:
+    def _download_from_modules(self, term: str, course_id: int, course_name: str) -> bool:
         modules_list = self.get_modules(course_id)
         
         for module in modules_list:
@@ -209,7 +213,7 @@ class CanvasDownloader(CanvasApi):
             if "errors" in module_items:
                 return False
             
-            module_path = [course_name, "module", module["name"].strip().replace("/", "&")]
+            module_path = [term, course_name, "module", module["name"].strip().replace("/", "&")]
             print_c("[M] " + module["name"], "item", 1)
             
             for item in module_items:
@@ -224,14 +228,14 @@ class CanvasDownloader(CanvasApi):
                         self._download_file(download_url, module_path)
         return True
     
-    def _download_from_assignments(self, course_id: int, course_name: str) -> bool:
+    def _download_from_assignments(self, term: str, course_id: int, course_name: str) -> bool:
         assignments = self.get_assignments(course_id)
         
         if "errors" in assignments:
             return False
         
         for assignment in assignments:
-            assignment_path = [course_name, "assignments", assignment["name"].strip().replace("/", "&")]
+            assignment_path = [term, course_name, "assignments", assignment["name"].strip().replace("/", "&")]
             print_c("[A] " + assignment["name"], "item", 1)
             submission = self.get_submission(course_id, assignment["id"])
             if submission is None or "errors" in submission:

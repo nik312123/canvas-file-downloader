@@ -69,6 +69,7 @@ class CanvasApi:
     
     domain: str
     token: str
+    user_id: str
     
     def __url(self, query: str) -> str:
         return "/".join(("https:/", self.domain, "api/v1", query))
@@ -103,6 +104,14 @@ class CanvasApi:
         """Gets the modules of a course"""
         return self.__get(f"courses/{course_id}/modules")
     
+    def get_assignments(self, course_id: int) -> Union[list, dict]:
+        """Gets the assignments of a course"""
+        return self.__get(f"courses/{course_id}/assignments")
+    
+    def get_submission(self, course_id: int, assignment_id: int) -> dict:
+        """Gets the submissions of an assignment"""
+        return self.__get(f"courses/{course_id}/assignments/{assignment_id}/submissions/{self.user_id}")
+    
     def get_files_from_folder(self, folder_id: int, recent: bool = True) -> Union[list, dict]:
         """Gets the files of a folder"""
         if recent:
@@ -131,7 +140,7 @@ class CanvasDownloader(CanvasApi):
     
     out_dir: str
     
-    def download_files(self, all_courses: bool = False, use: str = "both"):
+    def download_files(self, all_courses: bool = False, use: str = "all") -> bool:
         """Downloads files from Canvas"""
         courses = self.get_courses(not all_courses)
         
@@ -148,19 +157,19 @@ class CanvasDownloader(CanvasApi):
             print_c(course["course_code"], "group", 0)
             course_code, course_id = course["id"], course["course_code"]
             
-            methods: List[Callable[[int, str], bool]] = [self._download_from_modules, self._download_from_folders]
+            methods: List[Callable[[int, str], bool]]
             
-            if use == "both":
-                for method in methods:
-                    method(course_code, course_id)
-                continue
+            if use == "modules":
+                methods = [self._download_from_modules]
+            elif use == "folders":
+                methods = [self._download_from_folders]
+            elif use == "submissions":
+                methods = [self._download_from_assignments]
+            else:
+                methods = [self._download_from_modules, self._download_from_folders, self._download_from_assignments]
             
-            if use == "folders":
-                methods.reverse()
-            
-            available = methods[0](course_code, course_id)
-            if not available:
-                methods[1](course_code, course_id)
+            for method in methods:
+                method(course_code, course_id)
         return True
     
     def _download_from_folders(self, course_id: int, course_name: str) -> bool:
@@ -200,7 +209,6 @@ class CanvasDownloader(CanvasApi):
             if "errors" in module_items:
                 return False
             
-            # TODO: A module can have a name that is not a valid path
             module_path = [course_name, "module", module["name"].strip().replace("/", "&")]
             print_c("[M] " + module["name"], "item", 1)
             
@@ -214,7 +222,26 @@ class CanvasDownloader(CanvasApi):
                     download_url = get_external_download_url(item["external_url"])
                     if download_url:
                         self._download_file(download_url, module_path)
+        return True
+    
+    def _download_from_assignments(self, course_id: int, course_name: str) -> bool:
+        assignments = self.get_assignments(course_id)
         
+        if "errors" in assignments:
+            return False
+        
+        for assignment in assignments:
+            assignment_path = [course_name, "assignments", assignment["name"].strip().replace("/", "&")]
+            print_c("[A] " + assignment["name"], "item", 1)
+            submission = self.get_submission(course_id, assignment["id"])
+            if submission is None or "errors" in submission:
+                continue
+            if submission["workflow_state"] != "unsubmitted":
+                if submission["url"] is not None and "display_name" in submission:
+                    self._download_file(submission["url"], assignment_path, submission["display_name"])
+                if "attachments" in submission and submission["attachments"] is not None:
+                    for attachment in submission["attachments"]:
+                        self._download_file(attachment["url"], assignment_path, attachment["display_name"])
         return True
     
     def _download_file(self, file_url: str, folder_path: List[str], name: str = "") -> None:
@@ -282,12 +309,13 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description = "Download files from Canvas")
     parser.add_argument("token", metavar = "TOKEN", help = "Canvas access token")
     parser.add_argument("domain", metavar = "DOMAIN", help = "Canvas domain")
+    parser.add_argument("user_id", metavar = "USER_ID", help = "User ID")
     
     parser.add_argument(
         "-f",
         metavar = "FROM",
-        help = "Download from modules, folders or both (Default: both)",
-        choices = ("modules", "folders", "both"),
+        help = "Download from modules, folders, submissions, or all (Default: all)",
+        choices = ("modules", "folders", "submissions", "all"),
         default = "both"
     )
     
@@ -305,5 +333,6 @@ if __name__ == "__main__":
     
     args = parser.parse_args()
     
-    API = CanvasDownloader(args.domain, args.token, args.o)
-    API.download_files(args.all, use = args.f)
+    api = CanvasDownloader(args.domain, args.token, args.user_id, args.o)
+    # api.print_submissions()
+    api.download_files(args.all, use = args.f)

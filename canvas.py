@@ -127,12 +127,17 @@ class CanvasDowloader(CanvasApi):
     def download_files(self, all_courses=False, courses_ids=None, use="both"):
         """Downloads files from Canvas"""
         courses = self.get_courses(not all_courses)
+        print(courses)
 
         if "errors" in courses:
             print_c("error: " + courses["errors"][0]["message"], "error", 0)
             return False
 
         for course in courses:
+            restricted = course.get('access_restricted_by_date')
+            if restricted:
+                print(f"The course with ID {course['id']} was restricted by date: {course}")
+                continue
             print_c(course["course_code"], type_="group", padding=0)
             course_code, course_id = course["id"], course["course_code"]
 

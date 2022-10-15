@@ -5,7 +5,7 @@ Simple file downloader for Canvas of Instructure.
 Features:
 
 - Downloads all courses or only the ones marked as favorites
-- Download from Modules, Files or both
+- Download from modules, files, submissions, or all
 - If a file already exists, it's omitted
 - If a Google Drive file is linked, it will be downloaded
 
@@ -20,13 +20,14 @@ python -m pip install -r requirements.txt
 then, run the module with:
 
 ```shell
-python canvas.py YOUR-TOKEN CANVAS-DOMAIN
+python canvas.py YOUR-TOKEN CANVAS-DOMAIN USER-ID
 ```
 
 Where:
 
-- `YOUR-TOKEN` is the token access of Canvas, generated [here][get_token].
-- `CANVAS-DOMAIN` the Canvas domain where files will be downloaded (**Without** http:// or https://).
+- `YOUR-TOKEN`: The access token from Canvas. This can be created by going to Canvas and navigating to `Account` > `Settings` > `Approved Integrations` > `New Access Token`.
+- `CANVAS-DOMAIN`: the Canvas domain from which the files will be downloaded (**without** http:// or https://). For example, `example.instructure.com`.
+- `USER-ID`: your Canvas user ID. This can be found at `https://example.instructure.com/api/v1/users/self` in the `id` field, assuming that you replace `example.instructure.com` with `CANVAS-DOMAIN`.
 
 Optional parameters:
 

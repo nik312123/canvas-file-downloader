@@ -79,7 +79,14 @@ class CanvasApi:
             headers = {"Authorization": f"Bearer {self.token}"},
             **kwarg,
         )
-        return response.json()
+        result = response.json()
+        while "next" in response.links:
+            response = requests.get(
+                response.links["next"]["url"],
+                headers = {"Authorization": f"Bearer {self.token}"},
+            )
+            result.extend(response.json())
+        return result
     
     def get_courses(self, only_favorites: bool = True) -> list:
         """Returns the enrolled courses"""
@@ -97,7 +104,6 @@ class CanvasApi:
     
     def get_files_from_folder(self, folder_id: int, recent = True) -> list:
         """Gets the files of a folder"""
-        # TODO: the api by default gets only the first 10 uploaded files
         if recent:
             self.__get(
                 f"folders/{folder_id}/files",

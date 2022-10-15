@@ -86,7 +86,7 @@ class CanvasApi:
                 headers = {"Authorization": f"Bearer {self.token}"},
             )
             result.extend(response.json())
-        # Returns dict in the case of errors
+        # Returns dictionary if single result or errors occur
         return result
     
     def get_courses(self, only_favorites: bool = True) -> Union[list, dict]:
@@ -166,7 +166,6 @@ class CanvasDownloader(CanvasApi):
     def _download_from_folders(self, course_id: int, course_name: str) -> bool:
         folders_list = self.get_folders(course_id)
         for folder in folders_list:
-            
             if not folder["files_count"]:
                 continue
             
@@ -175,7 +174,7 @@ class CanvasDownloader(CanvasApi):
             if "errors" in files_list:
                 return False
             
-            current_folder_path = [course_name] + folder["full_name"].split("/")[1:]
+            current_folder_path = [course_name, "folders"] + folder["full_name"].split("/")[1:]
             print_c("[F] " + folder["full_name"], "item", 1)
             
             for file_obj in files_list:
@@ -202,19 +201,14 @@ class CanvasDownloader(CanvasApi):
                 return False
             
             # TODO: A module can have a name that is not a valid path
-            module_path = [course_name, module["name"].strip().replace("/", "&")]
+            module_path = [course_name, "module", module["name"].strip().replace("/", "&")]
             print_c("[M] " + module["name"], "item", 1)
             
             for item in module_items:
                 if item["type"] == "File":
                     file_obj = self.get_file_from_id(course_id, item["content_id"])
-                    folder_obj = self.get_folder_from_id(course_id, file_obj["folder_id"])
-                    if "full_name" in folder_obj:
-                        current_folder_path = [course_name] + folder_obj["full_name"].split("/")[1:]
-                    else:
-                        current_folder_path = module_path
                     self._download_file(
-                        file_obj["url"], current_folder_path, file_obj["display_name"]
+                        file_obj["url"], module_path, file_obj["display_name"]
                     )
                 elif item["type"] == "ExternalUrl":
                     download_url = get_external_download_url(item["external_url"])

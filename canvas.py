@@ -135,7 +135,7 @@ class CanvasDownloader(CanvasApi):
         for course in courses:
             restricted = course.get('access_restricted_by_date')
             if restricted:
-                print(f"The course with ID {course['id']} was restricted by date: {course}")
+                print(f"The following course was restricted by date: {course}")
                 continue
             print_c(course["course_code"], type_ = "group", padding = 0)
             course_code, course_id = course["id"], course["course_code"]
